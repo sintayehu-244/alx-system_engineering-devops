@@ -1,3 +1,4 @@
+# HAProxy config file for redirecting all http traffic to https
 global
 	log /dev/log	local0
 	log /dev/log	local1 notice
@@ -7,11 +8,14 @@ global
 	user haproxy
 	group haproxy
 	daemon
+
+	# Max connections
 	maxconn 2048
+	# Configure max size of temporary DHE keys that are generated
 	tune.ssl.default-dh-param 2048
 
 	# Default SSL material locations
-	ca-base /etc/ssl/certs
+	ca-base /etc/haproxy/certs
 	crt-base /etc/ssl/private
 
 	# Default ciphers to use on SSL-enabled listening sockets.
@@ -27,6 +31,10 @@ defaults
 	mode	http
 	option	httplog
 	option	dontlognull
+        # Ensure forwarded request includes client's IP
+	option forwardfor
+	# Reduce latency between HAProxy and users by closing conns
+	option http-server-close
         timeout connect 5000
         timeout client  50000
         timeout server  50000
@@ -38,23 +46,21 @@ defaults
 	errorfile 503 /etc/haproxy/errors/503.http
 	errorfile 504 /etc/haproxy/errors/504.http
 
-frontend http
-	 bind *:80
-	 reqadd X-Forwarded-Proto:\ http
-	 default_backend web-backend
+frontend www-frontend
+	bind *:80
+	bind *:443 ssl crt /etc/haproxy/certs/bennettdixon.online.pem
 
-frontend www-https
-	 bind *:443 ssl crt /etc/haproxy/haproxy.cfg
-	 reqadd X-Forwarded-Proto:\ https
-	 acl letsencrypt-acl path_beg /.well-known/acme-challenge/
-	 use_backend letsencrypt-backend if letsencrypt-acl
-	 default_backend web-backend
+	redirect scheme https code 301 if !{ ssl_fc }
+	# if configuration for certbot pass to certbot backend
+	acl letsencrypt-acl path_beg /.well-known/acme-challenge/
+	use_backend le-certbot-backend if letsencrypt-acl
 
-backend web-backend
-	balance roundrobin
-	redirect scheme https if !{ ssl_fc }
-	server 1238-web-01 3.94.211.201 check
-	server 1238-web-02 34.229.70.177 check
+	default_backend www-backend
 
-backend letsencrypt-backend
+backend le-certbot-backend
 	server letsencrypt 127.0.0.1:8888
+
+backend www-backend
+	balance roundrobin
+        server 496-web-01 35.243.204.105:80
+        server 496-web-02 35.190.182.239:80
