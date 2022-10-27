@@ -44,7 +44,7 @@ frontend http
 	 default_backend web-backend
 
 frontend www-https
-	 bind *:443 ssl crt /etc/haproxy/certs/www.jdrestre.tech.pem
+	 bind *:443 ssl crt /etc/haproxy/haproxy.cfg
 	 reqadd X-Forwarded-Proto:\ https
 	 acl letsencrypt-acl path_beg /.well-known/acme-challenge/
 	 use_backend letsencrypt-backend if letsencrypt-acl
@@ -53,8 +53,8 @@ frontend www-https
 backend web-backend
 	balance roundrobin
 	redirect scheme https if !{ ssl_fc }
-	server 1238-web-01 34.74.80.43:80 check
-	server 1238-web-02 54.89.185.132:80 check
+	server 1238-web-01 3.94.211.201 check
+	server 1238-web-02 34.229.70.177 check
 
 backend letsencrypt-backend
 	server letsencrypt 127.0.0.1:8888
